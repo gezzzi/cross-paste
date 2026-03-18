@@ -12,9 +12,12 @@
   "app": {
     "windows": [
       {
-        "title": "cross-paste",
-        "width": 800,
-        "height": 600
+        "title": "Cross-Paste Settings",
+        "width": 500,
+        "height": 600,
+        "visible": false,
+        "resizable": true,
+        "center": true
       }
     ],
     "security": {
