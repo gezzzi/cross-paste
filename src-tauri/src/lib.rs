@@ -11,6 +11,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager,
 };
+use tauri_plugin_autostart::ManagerExt;
 use tokio::sync::Mutex;
 
 #[tauri::command]
@@ -23,9 +24,18 @@ async fn get_settings(
 
 #[tauri::command]
 async fn save_settings(
+    app: tauri::AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
     new_settings: Settings,
 ) -> Result<(), String> {
+    // Update autostart
+    let autostart = app.autolaunch();
+    if new_settings.auto_start {
+        autostart.enable().map_err(|e| format!("Failed to enable autostart: {e}"))?;
+    } else {
+        autostart.disable().map_err(|e| format!("Failed to disable autostart: {e}"))?;
+    }
+
     settings::save_settings(&new_settings)?;
     let mut current = state.settings.lock().await;
     *current = new_settings;
