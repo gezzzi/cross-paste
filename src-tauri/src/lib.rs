@@ -48,9 +48,7 @@ async fn get_server_status(
 ) -> Result<api_types::ServerStatus, String> {
     let settings = state.settings.lock().await;
     let shutdown = state.server_shutdown_tx.lock().await;
-    let local_ip = local_ip_address::local_ip()
-        .map(|ip| ip.to_string())
-        .unwrap_or_else(|_| "unknown".to_string());
+    let local_ip = get_best_local_ip();
 
     Ok(api_types::ServerStatus {
         running: shutdown.is_some(),
@@ -92,11 +90,43 @@ async fn regenerate_api_key(
     Ok(new_key)
 }
 
+fn get_best_local_ip() -> String {
+    // Try local_ip first
+    if let Ok(ip) = local_ip_address::local_ip() {
+        return ip.to_string();
+    }
+    // Fallback: scan all interfaces for a non-virtual IPv4 address
+    if let Ok(interfaces) = local_ip_address::list_afinet_netifas() {
+        for (name, ip) in &interfaces {
+            if ip.is_ipv4()
+                && !ip.is_loopback()
+                && !name.to_lowercase().contains("vethernet")
+                && !name.to_lowercase().contains("wsl")
+                && !name.to_lowercase().contains("docker")
+                && !name.to_lowercase().contains("vmware")
+                && !name.to_lowercase().contains("virtualbox")
+            {
+                return ip.to_string();
+            }
+        }
+        // If no good match, return first non-loopback IPv4
+        for (_name, ip) in &interfaces {
+            if ip.is_ipv4() && !ip.is_loopback() {
+                return ip.to_string();
+            }
+        }
+    }
+    "unknown".to_string()
+}
+
 #[tauri::command]
 fn get_local_ip() -> Result<String, String> {
-    local_ip_address::local_ip()
-        .map(|ip| ip.to_string())
-        .map_err(|e| format!("Failed to get local IP: {e}"))
+    let ip = get_best_local_ip();
+    if ip == "unknown" {
+        Err("Failed to get local IP".to_string())
+    } else {
+        Ok(ip)
+    }
 }
 
 #[tauri::command]
